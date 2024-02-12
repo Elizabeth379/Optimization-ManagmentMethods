@@ -1,62 +1,76 @@
 import numpy as np
 
 
-def simplex_method(c, A, x, B):
+def simplex_method(c, x, A, b, B):
     m, n = A.shape
 
-    # Проверка на соответствие размеров
-    assert len(c) == n, "Размер вектора c должен быть равен числу переменных"
-    assert len(x) == n, "Размер вектора x должен быть равен числу переменных"
-    assert len(B) == m, "Размер множества B должен быть равен числу ограничений"
+    x_new = x.copy()
+
+    assert (np.linalg.matrix_rank(A) == m)
 
     # Основной цикл симплекс-метода
     while True:
+        #Шаг 1
         B_matrix = A[:, B]
-        print(B_matrix)
         B_inv = np.linalg.inv(B_matrix)
+
+        #Шаг 2
         c_B = c[B]
 
-        # Вычисление вектора ценности
-        delta_c = c - A.T.dot(B_inv.T).dot(c_B)
+        # Шаг 3
+        u = c_B @ B_inv
+        # Шаг 4
+        delta_c = u @ A - c
 
         # Проверка на оптимальность
         if np.all(delta_c >= 0):
-            return x
+            assert np.all(A @ x == b)
+            return x_new
 
-        # Выбор ведущего столбца
-        entering_index = np.where(delta_c < 0)[0][0]
-        d = np.zeros(n)
-        d[entering_index] = 1
+        # Шаг 6
+        j0 = np.where(delta_c < 0)[0][0]
 
-        # Вычисление направления
-        d_B = -B_inv.dot(A[:, entering_index])
+        # Шаг 7
+        z = B_inv @ A[:, j0]
 
-        # Проверка на неограниченность
-        if np.all(d_B >= 0):
-            return "Целевая функция не ограничена сверху"
+        # Шаг 8
+        theta = np.array([x_new[B[i]] / z[i] if z[i] > 0 else np.inf for i in range(m)])
 
-        # Вычисление длины шага
-        ratios = np.divide(x[B], d_B, out=np.full_like(x[B], np.inf), where=d_B < 0)
-        theta = np.min(ratios)
+        # Шаг 9
+        theta0 = np.min(theta)
 
-        # Обновление плана
-        x -= theta * d_B
-        x[abs(x) < 1e-10] = 0  # Очищаем значения, близкие к нулю
+        # Шаг 10
+        if theta0 == np.inf:
+            raise Exception("Целевая функция не ограничена сверху на множестве допустимых планов")
 
-        # Обновление множества B
-        leaving_index = np.argmin(ratios)
-        B[leaving_index] = entering_index
+        # Step 11
+        k = np.argmin(theta)
+        j_star = B[k]
+
+        # Step 12
+        B[k] = j0
+
+        # Step 12
+        for i in range(m):
+            if i != k:
+                x_new[B[i]] -= theta0 * z[i]
+
+        x_new[j0] = theta0
+        x_new[j_star] = 0
 
 
 if __name__ == '__main__':
-    # Пример использования
-    c = np.array([3, 2, 0, 0])
-    A = np.array([[1, 0, 1, 0],
-                  [0, 1, 0, 1]])
-    x = np.array([1, 2, 0, 0])
-    B = np.array([2, 3])  # Начальное множество базисных индексов
+    c = np.array([1, 1, 0, 0, 0])
+    x = np.array([0, 0, 1, 3, 2])
+    A = np.array([
+        [-1, 1, 1, 0, 0],
+        [1, 0, 0, 1, 0],
+        [0, 1, 0, 0, 1]
+    ])
+    b = np.array([1, 3, 2])
+    B = np.array([2, 3, 4])
 
-    optimal_plan = simplex_method(c, A, x, B)
+    optimal_plan = simplex_method(c, x, A, b, B)
     print("Оптимальный план:", optimal_plan)
 
 
